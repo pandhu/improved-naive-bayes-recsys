@@ -6,11 +6,11 @@ import java.util.*;
  */
 public class Model {
     private ArrayList<String> users;
-    private ArrayList<String> items;
-    private HashMap<String, Double> priorProbs;
+    private ArrayList<Item> items;
+    private HashMap<Item, Double> priorProbs;
     private ArrayList<Transaction> transactions;
-    private HashMap<String, ArrayList<String>> userInterests;
-    private HashMap<String, Double> conditionalProbs;
+    private HashMap<String, ArrayList<Item>> userInterests;
+    private HashMap<TupleItem, Double> conditionalProbs;
     private static final int CN= 3;
     public Model() {
         this.users = new ArrayList<>();
@@ -25,18 +25,18 @@ public class Model {
     public void assignUserInterests(){
         //initial user interests
         for(String user : users){
-            this.userInterests.put(user, new ArrayList<String>());
+            this.userInterests.put(user, new ArrayList<Item>());
         }
         for(Transaction transaction : transactions){
             if(!this.userInterests.get(transaction.user).contains(transaction.item))
                 this.userInterests.get(transaction.user).add(transaction.item);
         }
-
+    
     }
     public void calculatePriorProb(){
         System.out.println("Start calculate prior probabilistic");
         HashMap<String, HashMap<String, Integer>> hasVote = new HashMap<>();
-        HashMap<String, Integer> countProbs = new HashMap<>();
+        HashMap<Item, Integer> countProbs = new HashMap<>();
 
         for(Transaction transaction : this.transactions){
             //kalo si item baru muncul di transaksi
@@ -58,22 +58,25 @@ public class Model {
         while (it.hasNext()) {
             Map.Entry pair = (Map.Entry)it.next();
             double priorProbability = ((int) pair.getValue()/1.0)/users.size();
-            this.priorProbs.put(""+pair.getKey(), priorProbability);
+            this.priorProbs.put((Item)pair.getKey(), priorProbability);
         }
 
     }
 
     public void calculateConditionalProb(){
-        HashMap<String, Integer> count = new HashMap<>();
+        HashMap<TupleItem, Integer> count = new HashMap<>();
         for(String user : users){
-            for(String itemA: userInterests.get(user)){
-                for(String itemB: userInterests.get(user)) {
+            for(Item itemA: userInterests.get(user)){
+                for(Item itemB: userInterests.get(user)) {
                     if (!itemA.equals(itemB)) {
                         //kalo belom ada
-                        if(count.get(itemA+","+itemB) == null){
-                            count.put(itemA+","+itemB, 1);
+                        TupleItem tuple = new TupleItem();
+                        tuple.x = itemA;
+                        tuple.y = itemB;
+                        if(count.get(tuple) == null){
+                            count.put(tuple, 1);
                         } else {
-                            count.put(itemA+","+itemB, count.get(itemA+","+itemB)+1);
+                            count.put(tuple, count.get(tuple)+1);
                         }
                     }
                 }
@@ -84,15 +87,15 @@ public class Model {
         while (it.hasNext()) {
             Map.Entry pair = (Map.Entry)it.next();
             double jointProb = ((int) pair.getValue()/1.0)/users.size();
-            double conditionalProb = jointProb/this.priorProbs.get(pair.getKey().toString().split(",")[1]);
-            this.conditionalProbs.put(pair.getKey().toString(), conditionalProb);
+            double conditionalProb = jointProb/this.priorProbs.get(((TupleItem)pair.getKey()).x);
+            this.conditionalProbs.put((TupleItem) pair.getKey(), conditionalProb);
         }
     }
 
-    public HashMap<String, Double> makeTopNRecommendation(String user, int n){
-        HashMap<String, Double> recommendedItems = new HashMap<>();
+    public HashMap<Item, Double> makeTopNRecommendation(String user, int n){
+        HashMap<Item, Double> recommendedItems = new HashMap<>();
 
-        for(String item: this.items){
+        for(Item item: this.items){
             double priorProbs;
             if (this.priorProbs.get(item) == null){
                 priorProbs = 0;
@@ -100,25 +103,28 @@ public class Model {
                 priorProbs = this.priorProbs.get(item);
             }
             double recProbs = priorProbs;
-            for(String itemInterest: this.userInterests.get(user)){
+            for(Item itemInterest: this.userInterests.get(user)){
                 double conditionalProbs;
-                if(this.conditionalProbs.get(item+","+itemInterest) == null){
+                TupleItem tuple = new TupleItem();
+                tuple.x = item;
+                tuple.y = itemInterest;
+                if(this.conditionalProbs.get(tuple) == null){
                     conditionalProbs = 0;
                 } else {
-                    conditionalProbs = this.conditionalProbs.get(item+","+itemInterest);
+                    conditionalProbs = this.conditionalProbs.get(tuple);
                 }
                 recProbs = recProbs * Math.pow(conditionalProbs/priorProbs, CN/this.userInterests.get(user).size());
             }
             recommendedItems.put(item, recProbs);
         }
-        HashMap<String, Double> sortedRecommendedItems = sortByComparator(recommendedItems);
-        HashMap<String, Double> nRecommendedItems = new HashMap<>();
+        HashMap<Item, Double> sortedRecommendedItems = sortByComparator(recommendedItems);
+        HashMap<Item, Double> nRecommendedItems = new HashMap<>();
 
         Iterator it = sortedRecommendedItems.entrySet().iterator();
         for (int ii = 0; ii < n; ii++) {
             Map.Entry pair = (Map.Entry)it.next();
             System.out.println(pair.getKey()+","+pair.getValue());
-            nRecommendedItems.put(""+pair.getKey(), (double)pair.getValue());
+            nRecommendedItems.put((Item)pair.getKey(), (double)pair.getValue());
         }
         return nRecommendedItems;
     }
@@ -129,8 +135,8 @@ public class Model {
     }
 
     public void printItems(){
-        for(String item: this.items){
-            System.out.println(item);
+        for(Item item: this.items){
+            System.out.println(item.id);
         }
     }
 
@@ -157,7 +163,7 @@ public class Model {
     public void setUsers(ArrayList<String> users){
         this.users = users;
     }
-    public void setItems(ArrayList<String> items){
+    public void setItems(ArrayList<Item> items){
         this.items = items;
     }
     public void setTransactions(ArrayList<Transaction> transasctons){
@@ -187,24 +193,24 @@ public class Model {
     * UTILITIES
     * */
 
-    private static HashMap<String, Double> sortByComparator(HashMap<String, Double> unsortMap) {
+    private static HashMap<Item, Double> sortByComparator(HashMap<Item, Double> unsortMap) {
 
         // Convert Map to List
-        List<Map.Entry<String, Double>> list =
-                new LinkedList<Map.Entry<String, Double>>(unsortMap.entrySet());
+        List<Map.Entry<Item, Double>> list =
+                new LinkedList<Map.Entry<Item, Double>>(unsortMap.entrySet());
 
         // Sort list with comparator, to compare the Map values
-        Collections.sort(list, new Comparator<Map.Entry<String, Double>>() {
-            public int compare(Map.Entry<String, Double> o1,
-                               Map.Entry<String, Double> o2) {
+        Collections.sort(list, new Comparator<Map.Entry<Item, Double>>() {
+            public int compare(Map.Entry<Item, Double> o1,
+                               Map.Entry<Item, Double> o2) {
                 return (o2.getValue()).compareTo(o1.getValue());
             }
         });
 
         // Convert sorted map back to a Map
-        HashMap<String, Double> sortedMap = new LinkedHashMap<String, Double>();
-        for (Iterator<Map.Entry<String, Double>> it = list.iterator(); it.hasNext();) {
-            Map.Entry<String, Double> entry = it.next();
+        HashMap<Item, Double> sortedMap = new LinkedHashMap<Item, Double>();
+        for (Iterator<Map.Entry<Item, Double>> it = list.iterator(); it.hasNext();) {
+            Map.Entry<Item, Double> entry = it.next();
             sortedMap.put(entry.getKey(), entry.getValue());
         }
         return sortedMap;
@@ -234,11 +240,11 @@ public class Model {
         return users;
     }
 
-    public ArrayList<String> getItems() {
+    public ArrayList<Item> getItems() {
         return items;
     }
 
-    public HashMap<String, Double> getPriorProbs() {
+    public HashMap<Item, Double> getPriorProbs() {
         return priorProbs;
     }
 
@@ -246,11 +252,11 @@ public class Model {
         return transactions;
     }
 
-    public HashMap<String, ArrayList<String>> getUserInterests() {
+    public HashMap<String, ArrayList<Item>> getUserInterests() {
         return userInterests;
     }
 
-    public HashMap<String, Double> getConditionalProbs() {
+    public HashMap<TupleItem, Double> getConditionalProbs() {
         return conditionalProbs;
     }
 }
@@ -262,5 +268,39 @@ class Transaction{
     @Override
     public String toString(){
         return user+" buys "+item;
+    }
+}
+
+class Item{
+    public String name;
+    public String id;
+
+    @Override
+    public boolean equals(Object o)
+    {
+        return this.id.equals(((Item)o).id);
+    }
+    @Override
+    public int hashCode()
+    {
+        return this.id.hashCode();
+    }
+}
+
+class TupleItem{
+    public Item x;
+    public Item y;
+
+    @Override
+    public int hashCode()
+    {
+        return (x.name+","+y.name).hashCode();
+    }
+    @Override
+    public boolean equals(Object o)
+    {
+        Item oX = ((TupleItem)o).x;
+        Item oY = ((TupleItem)o).y;
+        return (x.name+","+y.name).equals(oX.name+","+oY.name);
     }
 }

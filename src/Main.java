@@ -23,7 +23,7 @@ public class Main {
             input = sc.nextLine();
             String user = input.split(" ")[0];
             int n = Integer.parseInt(input.split(" ")[1]);
-            HashMap<String, Double> recommendedItems = model.makeTopNRecommendation(user, n);
+            HashMap<Item, Double> recommendedItems = model.makeTopNRecommendation(user, n);
             printHashMap(recommendedItems);
         }while(!input.equals("q"));
 
@@ -31,12 +31,16 @@ public class Main {
         System.out.println(model.getConditionalProbs().size());
     }
 
-    public static ArrayList<String> readProduct(BufferedReader productReader) throws IOException {
+    public static ArrayList<Item> readProduct(BufferedReader productReader) throws IOException {
         String line;
-        ArrayList<String> products = new ArrayList<>();
+        ArrayList<Item> products = new ArrayList<>();
         while((line = productReader.readLine()) != null){
-            String product = line.split(",")[0];
-            products.add(product.substring(1,product.length()-1));
+            String productId = line.split(",")[0];
+            String name = line.split(",")[1];
+            Item item = new Item();
+            item.id = productId.substring(1, productId.length()-1);
+            item.name = name.substring(1, name.length()-1);
+            products.add(item);
         }
         return products;
     }
@@ -65,12 +69,12 @@ public class Main {
         return transactions;
     }
 
-    public static void printHashMap(HashMap<String, Double> map) {
+    public static void printHashMap(HashMap<Item, Double> map) {
         Map mp = map;
         Iterator it = mp.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry pair = (Map.Entry)it.next();
-                System.out.println(pair.getKey() + " = " + pair.getValue());
+                System.out.println(((Item)pair.getKey()).name + " = " + pair.getValue());
         }
     }
 }
