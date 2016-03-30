@@ -1,8 +1,5 @@
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by pandhu on 30/03/16.
@@ -14,6 +11,7 @@ public class Model {
     private ArrayList<Transaction> transactions;
     private HashMap<String, ArrayList<String>> userInterests;
     private HashMap<String, Double> conditionalProbs;
+    private static final int CN= 3;
     public Model() {
         this.users = new ArrayList<>();
         this.items = new ArrayList<>();
@@ -61,7 +59,6 @@ public class Model {
             Map.Entry pair = (Map.Entry)it.next();
             double priorProbability = ((int) pair.getValue()/1.0)/users.size();
             this.priorProbs.put(""+pair.getKey(), priorProbability);
-            it.remove();
         }
 
     }
@@ -89,10 +86,42 @@ public class Model {
             double jointProb = ((int) pair.getValue()/1.0)/users.size();
             double conditionalProb = jointProb/this.priorProbs.get(pair.getKey().toString().split(",")[1]);
             this.conditionalProbs.put(pair.getKey().toString(), conditionalProb);
-            it.remove();
         }
     }
 
+    public HashMap<String, Double> makeTopNRecommendation(String user, int n){
+        HashMap<String, Double> recommendedItems = new HashMap<>();
+
+        for(String item: this.items){
+            double priorProbs;
+            if (this.priorProbs.get(item) == null){
+                priorProbs = 0;
+            } else{
+                priorProbs = this.priorProbs.get(item);
+            }
+            double recProbs = priorProbs;
+            for(String itemInterest: this.userInterests.get(user)){
+                double conditionalProbs;
+                if(this.conditionalProbs.get(item+","+itemInterest) == null){
+                    conditionalProbs = 0;
+                } else {
+                    conditionalProbs = this.conditionalProbs.get(item+","+itemInterest);
+                }
+                recProbs = recProbs * Math.pow(conditionalProbs/priorProbs, CN/this.userInterests.get(user).size());
+            }
+            recommendedItems.put(item, recProbs);
+        }
+        HashMap<String, Double> sortedRecommendedItems = sortByComparator(recommendedItems);
+        HashMap<String, Double> nRecommendedItems = new HashMap<>();
+
+        Iterator it = sortedRecommendedItems.entrySet().iterator();
+        for (int ii = 0; ii < n; ii++) {
+            Map.Entry pair = (Map.Entry)it.next();
+            System.out.println(pair.getKey()+","+pair.getValue());
+            nRecommendedItems.put(""+pair.getKey(), (double)pair.getValue());
+        }
+        return nRecommendedItems;
+    }
     public void printUsers(){
         for(String user: this.users){
             System.out.println(user);
@@ -142,7 +171,6 @@ public class Model {
             Map.Entry pair = (Map.Entry)it.next();
             if(!pair.getValue().equals("0.0"))
                 System.out.println(pair.getKey() + " = " + pair.getValue());
-            it.remove();
         }
     }
 
@@ -153,8 +181,53 @@ public class Model {
             Map.Entry pair = (Map.Entry)it.next();
             if(!pair.getValue().equals("0.0"))
                 System.out.println(pair.getKey() + " = " + pair.getValue());
-            it.remove();
         }
+    }
+    /*
+    * UTILITIES
+    * */
+
+    private static HashMap<String, Double> sortByComparator(HashMap<String, Double> unsortMap) {
+
+        // Convert Map to List
+        List<Map.Entry<String, Double>> list =
+                new LinkedList<Map.Entry<String, Double>>(unsortMap.entrySet());
+
+        // Sort list with comparator, to compare the Map values
+        Collections.sort(list, new Comparator<Map.Entry<String, Double>>() {
+            public int compare(Map.Entry<String, Double> o1,
+                               Map.Entry<String, Double> o2) {
+                return (o2.getValue()).compareTo(o1.getValue());
+            }
+        });
+
+        // Convert sorted map back to a Map
+        HashMap<String, Double> sortedMap = new LinkedHashMap<String, Double>();
+        for (Iterator<Map.Entry<String, Double>> it = list.iterator(); it.hasNext();) {
+            Map.Entry<String, Double> entry = it.next();
+            sortedMap.put(entry.getKey(), entry.getValue());
+        }
+        return sortedMap;
+    }
+
+    private static HashMap sortByValues(HashMap map) {
+        List list = new LinkedList(map.entrySet());
+        // Defined Custom Comparator here
+        Collections.sort(list, new Comparator() {
+            public int compare(Object o1, Object o2) {
+                return ((Comparable) ((Map.Entry) (o2)).getValue())
+                        .compareTo(((Map.Entry) (o1)).getValue());
+            }
+        });
+
+        // Here I am copying the sorted list in HashMap
+        // using LinkedHashMap to preserve the insertion order
+        HashMap sortedHashMap = new LinkedHashMap();
+        for (Iterator it = list.iterator(); it.hasNext();) {
+            Map.Entry entry = (Map.Entry) it.next();
+            sortedHashMap.put(entry.getKey(), entry.getValue());
+        }
+        return sortedHashMap;
     }
 
     public ArrayList<String> getUsers() {

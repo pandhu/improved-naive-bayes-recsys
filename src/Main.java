@@ -1,5 +1,5 @@
 import java.io.*;
-import java.util.ArrayList;
+import java.util.*;
 
 /**
  * Created by pandhu on 30/03/16.
@@ -16,8 +16,16 @@ public class Main {
         model.setTransactions(readTransaction(transactionReader));
         model.calculatePriorProb();
         model.assignUserInterests();
-        model.calculateConditionalProb();
-        model.printConditionalProbs();
+        //Read Input
+        Scanner sc = new Scanner(System.in);
+        String input;
+        do{
+            input = sc.nextLine();
+            String user = input.split(" ")[0];
+            int n = Integer.parseInt(input.split(" ")[1]);
+            HashMap<String, Double> recommendedItems = model.makeTopNRecommendation(user, n);
+            printHashMap(recommendedItems);
+        }while(!input.equals("q"));
 
         System.out.println(model.getTransactions().size());
         System.out.println(model.getConditionalProbs().size());
@@ -55,5 +63,14 @@ public class Main {
             transactions.add(transaction);
         }
         return transactions;
+    }
+
+    public static void printHashMap(HashMap<String, Double> map) {
+        Map mp = map;
+        Iterator it = mp.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry pair = (Map.Entry)it.next();
+                System.out.println(pair.getKey() + " = " + pair.getValue());
+        }
     }
 }
